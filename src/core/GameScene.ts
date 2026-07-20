@@ -1,19 +1,32 @@
 import { Container } from "pixi.js";
 import { Block } from "./Block";
-import { Game } from "./Game";
+import type { AppProvider } from "./AppProvider";
+import { GameEvent } from "./GameEvent";
+
+export type SceneDependencies = {
+  getApp: AppProvider;
+  onWindowResize: GameEvent<void>;
+};
 
 export abstract class Scene extends Container {
-  blocks: Block[] = [];
+  private blocks: Block[] = [];
+  private active = false;
 
   private readonly handleResize = (): void => {
     this.resize();
   };
 
+  constructor(protected readonly dependencies: SceneDependencies) {
+    super();
+  }
+
   onEnter(): void | Promise<void> {
-    Game.events.onWindowResizeEvent.subscribe(this.handleResize);
+    this.active = true;
+    this.dependencies.onWindowResize.subscribe(this.handleResize);
   }
   onExit(): void | Promise<void> {
-    Game.events.onWindowResizeEvent.unsubscribe(this.handleResize);
+    this.active = false;
+    this.dependencies.onWindowResize.unsubscribe(this.handleResize);
     this.destroyAllBlocks();
   }
   addBlock(block: Block): void {
@@ -31,5 +44,8 @@ export abstract class Scene extends Container {
     this.blocks.forEach((element) => {
       element.resize();
     });
+  }
+  protected isActive(): boolean {
+    return this.active;
   }
 }

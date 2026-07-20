@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from "pixi.js";
 import { Block } from "../core/Block";
-import { Game } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
+import type { AudioManager } from "../core/AudioManager";
 
 export class MusicToggleBlock extends Block {
   private readonly container = new Container();
@@ -18,19 +19,27 @@ export class MusicToggleBlock extends Block {
     },
   });
 
+  constructor(
+    name: string,
+    private readonly getApp: AppProvider,
+    private readonly audioManager: AudioManager,
+  ) {
+    super(name);
+  }
+
   start(): void {
     this.button.eventMode = "static";
     this.button.cursor = "pointer";
     this.button.on("pointertap", this.toggleMusic);
 
     this.container.addChild(this.button, this.icon, this.label);
-    Game.app?.stage.addChild(this.container);
+    this.getApp()?.stage.addChild(this.container);
     this.redraw();
     this.resize();
   }
 
   resize(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app) return;
 
     const isCompactViewport =
@@ -50,13 +59,13 @@ export class MusicToggleBlock extends Block {
   }
 
   private readonly toggleMusic = (): void => {
-    const isEnabled = Game.toggleSound();
-    if (isEnabled) Game.startBackgroundMusic();
+    const isEnabled = this.audioManager.toggle();
+    if (isEnabled) this.audioManager.startBackgroundMusic();
     this.redraw();
   };
 
   private redraw(): void {
-    const isEnabled = Game.soundEnabled;
+    const isEnabled = this.audioManager.isEnabled();
     const background = isEnabled ? 0x522014 : 0x2f1736;
     const border = isEnabled ? 0xf8d76f : 0xa88ac1;
 

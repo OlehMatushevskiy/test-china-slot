@@ -1,6 +1,6 @@
 import { Container, Graphics, Text, Ticker } from "pixi.js";
 import { Block } from "../core/Block";
-import { Game } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
 
 export class ProgressBarBlock extends Block {
   private readonly container = new Container();
@@ -10,6 +10,10 @@ export class ProgressBarBlock extends Block {
   private targetProgress = 0;
   private displayedProgress = 0;
   private ticker?: Ticker;
+
+  constructor(name: string, private readonly getApp: AppProvider) {
+    super(name);
+  }
 
   start(): void {
     const track = new Graphics()
@@ -31,7 +35,7 @@ export class ProgressBarBlock extends Block {
 
     this.fillLayer.addChild(fill, highlight);
     this.container.addChild(glow, track, this.fillLayer);
-    Game.app?.stage.addChild(this.container);
+    this.getApp()?.stage.addChild(this.container);
     this.updatePosition();
 
     this.ticker = new Ticker();
@@ -61,7 +65,7 @@ export class ProgressBarBlock extends Block {
   }
 
   private updatePosition(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app) return;
 
     this.container.position.set(

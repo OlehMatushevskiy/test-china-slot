@@ -1,6 +1,6 @@
 import { Container, Text, Ticker } from "pixi.js";
 import { Block } from "../core/Block";
-import { Game } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
 
 export class LoadingTextBlock extends Block {
   private readonly container = new Container();
@@ -8,6 +8,10 @@ export class LoadingTextBlock extends Block {
   private subtitle?: Text;
   private ticker?: Ticker;
   private elapsedMs = 0;
+
+  constructor(name: string, private readonly getApp: AppProvider) {
+    super(name);
+  }
 
   start(): void {
     this.title = new Text({
@@ -29,7 +33,7 @@ export class LoadingTextBlock extends Block {
     });
 
     this.container.addChild(this.title, this.subtitle);
-    Game.app?.stage.addChild(this.container);
+    this.getApp()?.stage.addChild(this.container);
     this.updatePosition();
 
     this.ticker = new Ticker();
@@ -58,7 +62,7 @@ export class LoadingTextBlock extends Block {
   }
 
   private updatePosition(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app || !this.title || !this.subtitle) return;
 
     this.container.position.set(

@@ -1,8 +1,13 @@
 import { Application } from "pixi.js";
 import { useEffect, useRef } from "react";
-import { Game, GameScene } from "../core/Game";
+import type { GameInstance } from "../core/Game";
+import { GameScene } from "../core/SceneManager";
 
-const PixiCanvas = () => {
+type PixiCanvasProps = {
+    game: GameInstance;
+};
+
+const PixiCanvas = ({ game }: PixiCanvasProps) => {
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const appRef = useRef<Application | null>(null);
@@ -39,13 +44,13 @@ const PixiCanvas = () => {
 
             initialized = true;
 
-            Game.app = app;
+            game.sceneManager.attachApp(app);
 
             emitResize = () => {
-                Game.events.onWindowResizeEvent.emit();
+                game.onWindowResize.emit();
             }
 
-            Game.setScene(GameScene.PRELOAD);
+            void game.sceneManager.setScene(GameScene.PRELOAD);
             
             app.renderer.on("resize", emitResize);
 
@@ -57,14 +62,14 @@ const PixiCanvas = () => {
             disposed = true;
             if (emitResize) app.renderer.off("resize", emitResize);
             if (initialized) {
-                Game.currentScene?.onExit();
-                Game.currentScene = undefined;
-                Game.app = undefined;
+                game.sceneManager.detachApp();
+                game.slotPresentationController.cancel();
+                game.audioManager.dispose();
                 app.destroy(true);
             }
             appRef.current = null;
         };
-    },[]);
+    },[game]);
     
     return <canvas ref={canvasRef} className="pixi-canvas" />;
 };

@@ -1,34 +1,99 @@
 import { Assets } from "pixi.js";
 import "@esotericsoftware/spine-pixi-v8";
+import { LoadingErrorBlock } from "../blocks/LoadingErrorBlock";
 import { LoadingTextBlock } from "../blocks/LoadingTextBlock";
 import { ProgressBarBlock } from "../blocks/ProgressBarBlock";
-import { Scene } from "../core/GameScene";
+import { Scene, type SceneDependencies } from "../core/GameScene";
 import { gameAssets } from "../configs/GameAssets";
 import { delay } from "../helpers/GameHelper";
-import { Game, GameScene } from "../core/Game";
 
 export class LoadingScene extends Scene {
-  async onEnter(): Promise<void> {
-    super.onEnter();
-    const startedAt = performance.now();
-    const minimumLoadingTimeMs = 1400;
+  private loadAttempt = 0;
+  private isLoading = false;
 
-    const loadingBlock = new LoadingTextBlock("LoadingText");
+  constructor(
+    dependencies: SceneDependencies,
+    private readonly showMainGame: () => void,
+  ) {
+    super(dependencies);
+  }
+
+  onEnter(): void {
+    super.onEnter();
+    this.startLoading();
+  }
+
+  override onExit(): void {
+    this.loadAttempt += 1;
+    this.isLoading = false;
+    super.onExit();
+  }
+
+  private startLoading(): void {
+    if (!this.isActive() || this.isLoading) return;
+
+    const attempt = ++this.loadAttempt;
+    this.isLoading = true;
+    this.destroyAllBlocks();
+
+    const loadingBlock = new LoadingTextBlock(
+      "LoadingText",
+      this.dependencies.getApp,
+    );
     this.addBlock(loadingBlock);
 
-    const progressBarBlock = new ProgressBarBlock("ProgressBar");
+    const progressBarBlock = new ProgressBarBlock(
+      "ProgressBar",
+      this.dependencies.getApp,
+    );
     this.addBlock(progressBarBlock);
 
-    await Assets.load(gameAssets, (progress) => {
-      progressBarBlock.setProgress(progress);
-    });
+    void this.loadAssetsAndShowMain(attempt, progressBarBlock);
+  }
 
-    progressBarBlock.setProgress(1);
+  private async loadAssetsAndShowMain(
+    attempt: number,
+    progressBarBlock: ProgressBarBlock,
+  ): Promise<void> {
+    try {
+      const startedAt = performance.now();
+      const minimumLoadingTimeMs = 1400;
 
-    const elapsedMs = performance.now() - startedAt;
-    const remainingMs = Math.max(0, minimumLoadingTimeMs - elapsedMs);
-    await delay(remainingMs);
+      await Assets.load(gameAssets, (progress) => {
+        if (this.isCurrentLoad(attempt)) progressBarBlock.setProgress(progress);
+      });
 
-    Game.setScene(GameScene.MAIN_GAME);
+      if (!this.isCurrentLoad(attempt)) return;
+      progressBarBlock.setProgress(1);
+
+      const elapsedMs = performance.now() - startedAt;
+      const remainingMs = Math.max(0, minimumLoadingTimeMs - elapsedMs);
+      await delay(remainingMs);
+
+      if (!this.isCurrentLoad(attempt)) return;
+      this.isLoading = false;
+      this.showMainGame();
+    } catch (error) {
+      if (!this.isCurrentLoad(attempt)) return;
+
+      this.isLoading = false;
+      console.error("Failed to load game assets", error);
+      this.showLoadingError();
+    }
+  }
+
+  private showLoadingError(): void {
+    this.destroyAllBlocks();
+    this.addBlock(
+      new LoadingErrorBlock(
+        "LoadingError",
+        this.dependencies.getApp,
+        () => this.startLoading(),
+      ),
+    );
+  }
+
+  private isCurrentLoad(attempt: number): boolean {
+    return this.isActive() && this.loadAttempt === attempt;
   }
 }

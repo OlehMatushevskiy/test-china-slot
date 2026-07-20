@@ -16,4 +16,6 @@ pnpm-debug.log*
 yarn-debug.log*
 coverage/
 
-tmp
+tmp/
+
+*.DS_Store

@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
-import { Game } from "../core/Game";
+import { useSlotState } from "../hooks/useSlotState";
+import { useGame } from "../core/GameContext";
 
 export function ZeroBalanceFrame() {
-  const [slotState, setSlotState] = useState(Game.slotState);
-
-  useEffect(() => {
-    Game.events.onSlotStateChangedEvent.subscribe(setSlotState);
-    return () => Game.events.onSlotStateChangedEvent.unsubscribe(setSlotState);
-  }, []);
+  const { slotEngine } = useGame();
+  const slotState = useSlotState(slotEngine);
 
   const isVisible = slotState.phase === "idle" && slotState.balance === 0;
 

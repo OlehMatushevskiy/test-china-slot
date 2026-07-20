@@ -1,6 +1,6 @@
-import { Assets, Text, Texture, Sprite } from "pixi.js";
+import { Assets, Texture, Sprite } from "pixi.js";
 import { Block } from "../core/Block";
-import { Game } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
 import { GameAssetsAlias } from "../configs/GameAssets";
 
 const BACKGROUND_TEXTURE_RESOLUTION = 0.75;
@@ -8,7 +8,7 @@ const BACKGROUND_TEXTURE_RESOLUTION = 0.75;
 export class BackgroundBlock extends Block {
   private background: Sprite | undefined;
 
-  constructor(name: string) {
+  constructor(name: string, private readonly getApp: AppProvider) {
     super(name);
   }
 
@@ -16,7 +16,7 @@ export class BackgroundBlock extends Block {
     this.renderBackground();
   }
   private renderBackground(): void {
-    const app = Game.app;
+    const app = this.getApp();
 
     if (!app) {
       return;
@@ -36,7 +36,7 @@ export class BackgroundBlock extends Block {
     this.updatePosition();
   }
   private updatePosition(): void {
-    const app = Game.app;
+    const app = this.getApp();
 
     if (!app || !this.background) {
       return;

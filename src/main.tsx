@@ -6,11 +6,14 @@ import SlotControls from './components/SlotControls';
 import { PaylineInfo } from './components/PaylineInfo';
 import { SpinResultBanner } from './components/SpinResultBanner';
 import { ZeroBalanceFrame } from './components/ZeroBalanceFrame';
-import { Game, GameScene } from './core/Game';
+import { GameProvider, useGame } from './core/GameContext';
+import { GameScene } from './core/SceneManager';
 
-function App() {
+function GameApp() {
+  const game = useGame();
+  const { sceneManager } = game;
   const [isMainGameVisible, setIsMainGameVisible] = useState(
-    Game.currentScene === Game.scenes[GameScene.MAIN_GAME],
+    sceneManager.isCurrentScene(GameScene.MAIN_GAME),
   );
 
   useEffect(() => {
@@ -18,13 +21,13 @@ function App() {
       setIsMainGameVisible(scene === GameScene.MAIN_GAME);
     };
 
-    Game.events.onSceneChangedEvent.subscribe(handleSceneChange);
-    return () => Game.events.onSceneChangedEvent.unsubscribe(handleSceneChange);
+    sceneManager.onSceneChanged.subscribe(handleSceneChange);
+    return () => sceneManager.onSceneChanged.unsubscribe(handleSceneChange);
   }, []);
 
   return <main className="game-shell relative bg-slate-900">
     <div className="absolute inset-0 z-0">
-      <PixiCanvas />
+      <PixiCanvas game={game} />
     </div>
     {isMainGameVisible && <>
       <PaylineInfo />
@@ -33,6 +36,14 @@ function App() {
       <SlotControls />
     </>}
   </main>
+}
+
+function App() {
+  return (
+    <GameProvider>
+      <GameApp />
+    </GameProvider>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

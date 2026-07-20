@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from "pixi.js";
 import { Block } from "../core/Block";
-import { Game, GameScene } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
+import type { AudioManager } from "../core/AudioManager";
 
 export class MusicEnabledBlock extends Block {
   private readonly container = new Container();
@@ -11,6 +12,15 @@ export class MusicEnabledBlock extends Block {
   private onLabel?: Text;
   private offLabel?: Text;
   private hasSelected = false;
+
+  constructor(
+    name: string,
+    private readonly getApp: AppProvider,
+    private readonly audioManager: AudioManager,
+    private readonly continueToLoading: () => void,
+  ) {
+    super(name);
+  }
 
   start(): void {
     this.title = new Text({
@@ -38,7 +48,7 @@ export class MusicEnabledBlock extends Block {
       this.onLabel,
       this.offLabel,
     );
-    Game.app?.stage.addChild(this.container);
+    this.getApp()?.stage.addChild(this.container);
     this.updateButtons();
     this.updatePosition();
   }
@@ -73,9 +83,9 @@ export class MusicEnabledBlock extends Block {
     if (this.hasSelected) return;
 
     this.hasSelected = true;
-    Game.setSoundEnabled(enabled);
-    if (enabled) Game.startBackgroundMusic();
-    Game.setScene(GameScene.LOADING);
+    this.audioManager.setEnabled(enabled);
+    if (enabled) this.audioManager.startBackgroundMusic();
+    this.continueToLoading();
   }
 
   private configureButton(button: Graphics, onTap: () => void): void {
@@ -88,8 +98,8 @@ export class MusicEnabledBlock extends Block {
   }
 
   private updateButtons(): void {
-    this.drawOption(this.onButton, Game.soundEnabled);
-    this.drawOption(this.offButton, !Game.soundEnabled);
+    this.drawOption(this.onButton, this.audioManager.isEnabled());
+    this.drawOption(this.offButton, !this.audioManager.isEnabled());
   }
 
   private drawOption(button: Graphics, selected: boolean): void {
@@ -107,7 +117,7 @@ export class MusicEnabledBlock extends Block {
   }
 
   private updatePosition(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app) return;
 
     this.overlay.clear();

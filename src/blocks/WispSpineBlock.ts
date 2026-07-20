@@ -1,5 +1,7 @@
 import { Block } from "../core/Block";
-import { DemoSpinResult, Game } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
+import type { SlotEngine, SpinResult } from "../core/SlotEngine";
+import type { SlotPresentationController } from "../core/SlotPresentationController";
 import { GameAssetsAlias } from "../configs/GameAssets";
 import { getSlotBoardLayout } from "../configs/GameLayout";
 import { Spine } from "@esotericsoftware/spine-pixi-v8";
@@ -18,21 +20,22 @@ const DESKTOP_WISP_MAX_SCALE = 0.34;
 export class WispSpineBlock extends Block {
   private wisp?: Spine;
   private pendingWin = false;
-  private readonly handleSpinRequest = (result: DemoSpinResult): void => {
-    this.pendingWin = result.reelStops.every(
-      (symbol) => symbol === result.reelStops[0],
-    );
+  private readonly handleSpinRequest = (result: SpinResult): void => {
+    this.pendingWin = result.winAmount > 0;
   };
-  private readonly handleSpinStateChange = (isSpinning: boolean): void => {
-    if (!isSpinning) this.presentResult();
-  };
+  private readonly handleResultPresented = (): void => this.presentResult();
 
-  constructor(name: string) {
+  constructor(
+    name: string,
+    private readonly getApp: AppProvider,
+    private readonly slotEngine: SlotEngine,
+    private readonly presentationController: SlotPresentationController,
+  ) {
     super(name);
   }
 
   start(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app) return;
 
     this.wisp = Spine.from({
@@ -43,13 +46,15 @@ export class WispSpineBlock extends Block {
     this.wisp.state.setAnimation(0, "idle", true);
 
     app.stage.addChild(this.wisp);
-    Game.events.onSpinRequestedEvent.subscribe(this.handleSpinRequest);
-    Game.events.onSpinStateChangedEvent.subscribe(this.handleSpinStateChange);
+    this.slotEngine.onSpinReady.subscribe(this.handleSpinRequest);
+    this.presentationController.onResultPresented.subscribe(
+      this.handleResultPresented,
+    );
     this.resize();
   }
 
   override resize(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app || !this.wisp) return;
 
     const { width, height } = app.screen;
@@ -84,8 +89,10 @@ export class WispSpineBlock extends Block {
   }
 
   override end(): void {
-    Game.events.onSpinRequestedEvent.unsubscribe(this.handleSpinRequest);
-    Game.events.onSpinStateChangedEvent.unsubscribe(this.handleSpinStateChange);
+    this.slotEngine.onSpinReady.unsubscribe(this.handleSpinRequest);
+    this.presentationController.onResultPresented.unsubscribe(
+      this.handleResultPresented,
+    );
     this.wisp?.parent?.removeChild(this.wisp);
     this.wisp?.destroy({ children: true });
     this.wisp = undefined;

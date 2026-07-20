@@ -1,7 +1,9 @@
 import { Assets, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { gsap } from "gsap";
 import { Block } from "../core/Block";
-import { DemoSpinResult, Game } from "../core/Game";
+import type { AppProvider } from "../core/AppProvider";
+import type { SlotEngine, SpinResult } from "../core/SlotEngine";
+import type { SlotPresentationController } from "../core/SlotPresentationController";
 import { GameAssetsAlias } from "../configs/GameAssets";
 import { getSlotBoardLayout } from "../configs/GameLayout";
 
@@ -38,7 +40,7 @@ export class SlotBoardBlock extends Block {
     GameAssetsAlias.SYMBOL_LANTERN,
     GameAssetsAlias.SYMBOL_INGOT,
   ];
-  private readonly handleSpinRequest = (result: DemoSpinResult): void =>
+  private readonly handleSpinRequest = (result: SpinResult): void =>
     this.spin(result);
 
   private readonly tileLayouts: TileLayout[] = [
@@ -46,6 +48,15 @@ export class SlotBoardBlock extends Block {
     { x: 598 / 1536, y: 319 / 1024, width: 340 / 1536, height: 486 / 1024 },
     { x: 978 / 1536, y: 319 / 1024, width: 314 / 1536, height: 486 / 1024 },
   ];
+
+  constructor(
+    name: string,
+    private readonly getApp: AppProvider,
+    private readonly slotEngine: SlotEngine,
+    private readonly presentationController: SlotPresentationController,
+  ) {
+    super(name);
+  }
 
   start(): void {
     const boardTexture = Assets.get<Texture>(GameAssetsAlias.SLOT_BOARD);
@@ -59,13 +70,13 @@ export class SlotBoardBlock extends Block {
     this.symbolLayer.mask = this.reelMask;
     this.container.addChild(this.symbolLayer, this.reelMask);
 
-    Game.app?.stage.addChild(this.container);
-    Game.events.onSpinRequestedEvent.subscribe(this.handleSpinRequest);
+    this.getApp()?.stage.addChild(this.container);
+    this.slotEngine.onSpinReady.subscribe(this.handleSpinRequest);
     this.resize();
   }
 
   resize(): void {
-    const app = Game.app;
+    const app = this.getApp();
     if (!app || !this.board) return;
 
     const boardTexture = this.board.texture;
@@ -105,9 +116,8 @@ export class SlotBoardBlock extends Block {
     this.spinTimeline?.kill();
     this.spinTimeline = undefined;
     this.isSpinning = false;
-    Game.events.onSpinRequestedEvent.unsubscribe(this.handleSpinRequest);
-    Game.cancelActiveSpin();
-    Game.events.onSpinStateChangedEvent.emit(false);
+    this.slotEngine.onSpinReady.unsubscribe(this.handleSpinRequest);
+    this.presentationController.cancel();
     this.container.parent?.removeChild(this.container);
 
     this.symbolLayer.mask = null;
@@ -145,24 +155,22 @@ export class SlotBoardBlock extends Block {
     return reel;
   }
 
-  private spin(result: DemoSpinResult): void {
+  private spin(result: SpinResult): void {
     if (this.isSpinning || this.reels.length === 0) return;
 
     const finalSymbolIndexes = result.reelStops;
     this.isSpinning = true;
-    Game.events.onSpinStateChangedEvent.emit(true);
     this.spinTimeline?.kill();
 
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.spinTimeline = gsap.timeline({
       onComplete: () => {
         this.isSpinning = false;
         this.spinTimeline = undefined;
-        Game.playResultSound(result.winAmount > 0);
-        Game.presentSpinResult(result);
-        Game.events.onSpinStateChangedEvent.emit(false);
+        this.presentationController.completeReels(result);
       },
     });
 
