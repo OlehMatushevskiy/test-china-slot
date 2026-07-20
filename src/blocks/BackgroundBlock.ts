@@ -3,6 +3,8 @@ import { Block } from "../core/Block";
 import { Game } from "../core/Game";
 import { GameAssetsAlias } from "../configs/GameAssets";
 
+const BACKGROUND_TEXTURE_RESOLUTION = 0.75;
+
 export class BackgroundBlock extends Block {
   private background: Sprite | undefined;
 
@@ -21,6 +23,8 @@ export class BackgroundBlock extends Block {
     }
 
     const texture = Assets.get<Texture>(GameAssetsAlias.BACKGROUND);
+    texture.source.resolution = BACKGROUND_TEXTURE_RESOLUTION;
+    texture.update();
 
     this.background = new Sprite(texture);
     this.background.anchor.set(0.5, 0);

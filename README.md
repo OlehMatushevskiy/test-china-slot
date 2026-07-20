@@ -2,21 +2,24 @@
 
 React + TypeScript + PixiJS + Tailwind CSS + Webpack slot prototype with a colorful Chinese fortune / nature theme.
 
-## Run locally
+## 1. Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL printed by Webpack, normally http://localhost:8080.
+After that open:
+http://localhost:8080
 
-Visual theme assets live in `assets/` and are wired through `src/configs/GameAssets.ts`.
-
-## Production build
+## 2. Or run with docker
 
 ```bash
-npm run build
+docker build -t test-slot .
 ```
 
-The bundled files are written to `dist/`.
+After building
+
+```bash
+docker run --rm -p 8080:80 test-slot
+```

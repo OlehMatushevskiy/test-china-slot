@@ -15,7 +15,7 @@ module.exports = (_, argv) => ({
     rules: [
       { test: /\.tsx?$/, use: 'ts-loader', exclude: /node_modules/ },
       { test: /\.css$/, use: ['style-loader', 'css-loader', 'postcss-loader'] },
-      { test: /\.(png|jpe?g|gif|mp3|ogg|skel|atlas)$/i, type: 'asset/resource' },
+      { test: /\.(png|jpe?g|gif|webp|mp3|ogg|skel|atlas|json)$/i, type: 'asset/resource' },
     ],
   },
   plugins: [
@@ -23,8 +23,7 @@ module.exports = (_, argv) => ({
     new CopyPlugin({
       patterns: [
         { from: 'public', to: 'public', noErrorOnMissing: true },
-        // The Spine atlas references this page by its literal filename.
-        { from: 'assets/spine/dragon-ess.png', to: 'dragon-ess.png' },
+        { from: 'assets/spine_1/azure.png', to: 'azure.png' },
       ],
     }),
   ],

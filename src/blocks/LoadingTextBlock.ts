@@ -50,7 +50,11 @@ export class LoadingTextBlock extends Block {
   end(): void {
     this.ticker?.stop();
     this.ticker?.destroy();
+    this.ticker = undefined;
+    this.container.parent?.removeChild(this.container);
     this.container.destroy({ children: true });
+    this.title = undefined;
+    this.subtitle = undefined;
   }
 
   private updatePosition(): void {

@@ -3,6 +3,11 @@ declare module "*.png" {
   export default src;
 }
 
+declare module "*.webp" {
+  const src: string;
+  export default src;
+}
+
 declare module "*.mp3" {
   const src: string;
   export default src;
@@ -19,6 +24,11 @@ declare module "*.skel" {
 }
 
 declare module "*.atlas" {
+  const src: string;
+  export default src;
+}
+
+declare module "*.json" {
   const src: string;
   export default src;
 }

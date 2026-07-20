@@ -1,7 +1,7 @@
 import { useState } from "react";
-import dragonSymbol from "../../assets/symbol-lucky-dragon.png";
-import lanternSymbol from "../../assets/symbol-red-lantern.png";
-import coinSymbol from "../../assets/symbol-golden-ingot.png";
+import dragonSymbol from "../../assets/symbol-lucky-dragon.webp";
+import lanternSymbol from "../../assets/symbol-red-lantern.webp";
+import coinSymbol from "../../assets/symbol-golden-ingot.webp";
 
 type Payline = {
   label: string;
@@ -16,8 +16,6 @@ const PAYLINES: Payline[] = [
 ];
 
 export function PaylineInfo() {
-  // Keep the reel area clear by default on phones and short landscape views.
-  // The full payout table remains one tap away.
   const [isOpen, setIsOpen] = useState(
     () => window.innerWidth > 560 && window.innerHeight > 600,
   );

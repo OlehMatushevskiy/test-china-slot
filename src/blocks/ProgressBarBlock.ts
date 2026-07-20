@@ -56,6 +56,7 @@ export class ProgressBarBlock extends Block {
     this.ticker?.stop();
     this.ticker?.destroy();
     this.ticker = undefined;
+    this.container.parent?.removeChild(this.container);
     this.container.destroy({ children: true });
   }
 

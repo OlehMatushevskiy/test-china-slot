@@ -8,6 +8,15 @@ import { MainGameScene } from "../scenes/MainGameScene";
 import { GameAssets } from "../configs/GameAssets";
 
 const SOUND_ENABLED_STORAGE_KEY = "slot-sound-enabled";
+export const SLOT_MIN_BET = 10;
+export const SLOT_BET_STEP = 10;
+const INITIAL_BALANCE = 1_000;
+const RESULT_PRESENTATION_DURATION_MS = 1_100;
+const REDUCED_MOTION_RESULT_DURATION_MS = 600;
+
+const WIN_MULTIPLIERS = [3, 2, 5] as const;
+
+let nextDemoSpinId = 0;
 
 type ResultSounds = {
   win?: HTMLAudioElement;
@@ -30,11 +39,51 @@ export const GameScene = {
 
 export type GameSceneKey = (typeof GameScene)[keyof typeof GameScene];
 
-// This is intentionally a local prototype result. A production slot must
-// receive an authoritative, validated outcome from its game server instead.
 export type DemoSpinResult = {
   spinId: number;
   reelStops: number[];
+  bet: number;
+  winAmount: number;
+  balance: number;
+};
+
+type DemoSpinRequest = {
+  spinId: number;
+  bet: number;
+  balance: number;
+};
+
+export type SlotPhase =
+  | "idle"
+  | "requesting"
+  | "spinning"
+  | "presentingWin"
+  | "presentingLoss";
+
+export type SlotState = {
+  phase: SlotPhase;
+  bet: number;
+  balance: number;
+  spinId?: number;
+  result?: DemoSpinResult;
+};
+
+export const requestMockSpinResult = (
+  request: DemoSpinRequest,
+): Promise<DemoSpinResult> => {
+  const reelStops = Array.from({ length: 3 }, () =>
+    Math.floor(Math.random() * WIN_MULTIPLIERS.length),
+  );
+  const isWin = reelStops.every((symbol) => symbol === reelStops[0]);
+  const winAmount = isWin ? request.bet * WIN_MULTIPLIERS[reelStops[0]] : 0;
+
+  return Promise.resolve({
+    spinId: request.spinId,
+    reelStops,
+    bet: request.bet,
+    winAmount,
+    balance: request.balance - request.bet + winAmount,
+  });
 };
 
 type GAME_Type = {
@@ -45,7 +94,9 @@ type GAME_Type = {
     onSceneChangedEvent: GameEvent<GameSceneKey>;
     onSpinRequestedEvent: GameEvent<DemoSpinResult>;
     onSpinStateChangedEvent: GameEvent<boolean>;
+    onSlotStateChangedEvent: GameEvent<SlotState>;
   };
+  slotState: SlotState;
   soundEnabled: boolean;
   backgroundMusic: HTMLAudioElement | undefined;
   resultSounds: ResultSounds;
@@ -55,9 +106,14 @@ type GAME_Type = {
   stopBackgroundMusic: () => void;
   preloadSoundEffects: () => void;
   playResultSound: (isWin: boolean) => void;
-  requestDemoSpin: () => void;
+  setSlotState: (state: SlotState) => void;
+  adjustBet: (amount: number) => void;
+  requestDemoSpin: () => boolean;
+  presentSpinResult: (result: DemoSpinResult) => void;
+  cancelActiveSpin: () => void;
   setScene: (sceneKey: GameSceneKey) => void;
   app: Application | undefined;
+  resultPresentationTimeout: number | undefined;
 };
 
 export const Game: GAME_Type = {
@@ -72,6 +128,12 @@ export const Game: GAME_Type = {
     onSceneChangedEvent: new GameEvent<GameSceneKey>("OnSceneChanged"),
     onSpinRequestedEvent: new GameEvent<DemoSpinResult>("OnSpinRequested"),
     onSpinStateChangedEvent: new GameEvent<boolean>("OnSpinStateChanged"),
+    onSlotStateChangedEvent: new GameEvent<SlotState>("OnSlotStateChanged"),
+  },
+  slotState: {
+    phase: "idle",
+    bet: SLOT_MIN_BET,
+    balance: INITIAL_BALANCE,
   },
   soundEnabled: getInitialSoundEnabled(),
   setSoundEnabled(enabled) {
@@ -97,13 +159,10 @@ export const Game: GAME_Type = {
       const music = new Audio(GameAssets.BACKGROUND_MUSIC.url);
       music.loop = true;
       music.preload = "auto";
-      music.volume = 0.35;
+      music.volume = 0.3;
       this.backgroundMusic = music;
     }
 
-    // Playback can be rejected when the browser does not consider the scene
-    // selection a user gesture. Audio is optional, so keep the game running
-    // and let the player enable it again from the in-game music control.
     void this.backgroundMusic.play().catch(() => undefined);
   },
   stopBackgroundMusic() {
@@ -127,19 +186,119 @@ export const Game: GAME_Type = {
     this.preloadSoundEffects();
     const sound = this.resultSounds[cue]!;
 
-    sound.volume = isWin ? 0.55 : 0.4;
+    sound.volume = isWin ? 0.62 : 0.47;
     sound.currentTime = 0;
     this.resultSounds[cue] = sound;
     void sound.play().catch(() => undefined);
   },
-  requestDemoSpin() {
-    const reelStops = Array.from(
-      { length: 3 },
-      () => Math.floor(Math.random() * 3),
+  setSlotState(state) {
+    this.slotState = state;
+    this.events.onSlotStateChangedEvent.emit(state);
+  },
+  adjustBet(amount) {
+    const state = this.slotState;
+    if (state.phase !== "idle") return;
+
+    const bet = Math.max(
+      SLOT_MIN_BET,
+      Math.min(state.balance, state.bet + amount),
     );
-    this.events.onSpinRequestedEvent.emit({
-      spinId: Date.now(),
-      reelStops,
+    if (bet === state.bet) return;
+
+    this.setSlotState({ ...state, bet });
+  },
+  requestDemoSpin() {
+    const state = this.slotState;
+    if (state.phase !== "idle" || state.balance < state.bet) return false;
+
+    const spinId = ++nextDemoSpinId;
+    this.setSlotState({
+      ...state,
+      phase: "requesting",
+      spinId,
+      result: undefined,
+    });
+
+    void requestMockSpinResult({
+      spinId,
+      bet: state.bet,
+      balance: state.balance,
+    })
+      .then((result) => {
+        if (
+          this.slotState.phase !== "requesting" ||
+          this.slotState.spinId !== result.spinId
+        ) {
+          return;
+        }
+
+        this.setSlotState({
+          ...this.slotState,
+          phase: "spinning",
+          balance: result.balance,
+          result,
+        });
+        this.events.onSpinRequestedEvent.emit(result);
+      })
+      .catch(() => {
+        if (
+          this.slotState.phase === "requesting" &&
+          this.slotState.spinId === spinId
+        ) {
+          this.setSlotState({
+            ...this.slotState,
+            phase: "idle",
+            spinId: undefined,
+          });
+        }
+      });
+
+    return true;
+  },
+  presentSpinResult(result) {
+    if (
+      this.slotState.phase !== "spinning" ||
+      this.slotState.spinId !== result.spinId
+    ) {
+      return;
+    }
+
+    if (this.resultPresentationTimeout !== undefined) {
+      window.clearTimeout(this.resultPresentationTimeout);
+    }
+
+    this.setSlotState({
+      ...this.slotState,
+      phase: result.winAmount > 0 ? "presentingWin" : "presentingLoss",
+      result,
+    });
+
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)")
+      .matches
+      ? REDUCED_MOTION_RESULT_DURATION_MS
+      : RESULT_PRESENTATION_DURATION_MS;
+    this.resultPresentationTimeout = window.setTimeout(() => {
+      if (this.slotState.spinId !== result.spinId) return;
+      this.setSlotState({
+        ...this.slotState,
+        phase: "idle",
+        spinId: undefined,
+      });
+      this.resultPresentationTimeout = undefined;
+    }, duration);
+  },
+  cancelActiveSpin() {
+    if (this.resultPresentationTimeout !== undefined) {
+      window.clearTimeout(this.resultPresentationTimeout);
+      this.resultPresentationTimeout = undefined;
+    }
+
+    if (this.slotState.phase === "idle") return;
+    this.setSlotState({
+      ...this.slotState,
+      phase: "idle",
+      spinId: undefined,
+      result: undefined,
     });
   },
   setScene(sceneKey) {
@@ -175,4 +334,5 @@ export const Game: GAME_Type = {
   app: undefined,
   backgroundMusic: undefined,
   resultSounds: {},
+  resultPresentationTimeout: undefined,
 };

@@ -1,16 +1,13 @@
-import backgroundUrl from "../../assets/chinese-slot-background.png";
-import boardUrl from "../../assets/chinese-slot-board-transparent.png";
-import dragonSymbolUrl from "../../assets/symbol-lucky-dragon.png";
-import lanternSymbolUrl from "../../assets/symbol-red-lantern.png";
-import ingotSymbolUrl from "../../assets/symbol-golden-ingot.png";
-import minusButtonUrl from "../../assets/minus-button-centered.png";
-import plusButtonUrl from "../../assets/plus-button-matched.png";
-import spinButtonUrl from "../../assets/spin-button-centered.png";
+import backgroundUrl from "../../assets/chinese-slot-background.webp";
+import boardUrl from "../../assets/chinese-slot-board-transparent.webp";
+import dragonSymbolUrl from "../../assets/symbol-lucky-dragon.webp";
+import lanternSymbolUrl from "../../assets/symbol-red-lantern.webp";
+import ingotSymbolUrl from "../../assets/symbol-golden-ingot.webp";
 import backgroundMusicUrl from "../../audio/background-music.mp3";
 import winSoundUrl from "../../audio/win.mp3";
 import loseSoundUrl from "../../audio/lose.mp3";
-import dragonSkelUrl from "../../assets/spine/dragon-ess.skel";
-import dragonAtlasUrl from "../../assets/spine/dragon-ess.atlas";
+import wispAtlasUrl from "../../assets/spine_1/azure.atlas";
+import wispDataUrl from "../../assets/spine_1/azure.json";
 
 export const GameAssetsAlias = {
   BACKGROUND: backgroundUrl,
@@ -18,14 +15,11 @@ export const GameAssetsAlias = {
   SYMBOL_DRAGON: dragonSymbolUrl,
   SYMBOL_LANTERN: lanternSymbolUrl,
   SYMBOL_INGOT: ingotSymbolUrl,
-  MINUS_BUTTON: minusButtonUrl,
-  PLUS_BUTTON: plusButtonUrl,
-  SPIN_BUTTON: spinButtonUrl,
   BACKGROUND_MUSIC: backgroundMusicUrl,
   WIN_SOUND: winSoundUrl,
   LOSE_SOUND: loseSoundUrl,
-  DRAGON_DATA: "dragon-data",
-  DRAGON_ATLAS: "dragon-atlas",
+  WISP_DATA: "wisp-data",
+  WISP_ATLAS: "wisp-atlas",
 } as const;
 
 export const GameAssets = {
@@ -49,18 +43,6 @@ export const GameAssets = {
     alias: GameAssetsAlias.SYMBOL_INGOT,
     url: ingotSymbolUrl,
   },
-  MINUS_BUTTON: {
-    alias: GameAssetsAlias.MINUS_BUTTON,
-    url: minusButtonUrl,
-  },
-  PLUS_BUTTON: {
-    alias: GameAssetsAlias.PLUS_BUTTON,
-    url: plusButtonUrl,
-  },
-  SPIN_BUTTON: {
-    alias: GameAssetsAlias.SPIN_BUTTON,
-    url: spinButtonUrl,
-  },
   BACKGROUND_MUSIC: {
     alias: GameAssetsAlias.BACKGROUND_MUSIC,
     url: backgroundMusicUrl,
@@ -73,13 +55,13 @@ export const GameAssets = {
     alias: GameAssetsAlias.LOSE_SOUND,
     url: loseSoundUrl,
   },
-  DRAGON_DATA: {
-    alias: GameAssetsAlias.DRAGON_DATA,
-    url: dragonSkelUrl,
+  WISP_DATA: {
+    alias: GameAssetsAlias.WISP_DATA,
+    url: wispDataUrl,
   },
-  DRAGON_ATLAS: {
-    alias: GameAssetsAlias.DRAGON_ATLAS,
-    url: dragonAtlasUrl,
+  WISP_ATLAS: {
+    alias: GameAssetsAlias.WISP_ATLAS,
+    url: wispAtlasUrl,
   },
 } as const;
 
@@ -105,23 +87,11 @@ export const gameAssets = [
     src: ingotSymbolUrl,
   },
   {
-    alias: GameAssetsAlias.MINUS_BUTTON,
-    src: minusButtonUrl,
+    alias: GameAssetsAlias.WISP_DATA,
+    src: wispDataUrl,
   },
   {
-    alias: GameAssetsAlias.PLUS_BUTTON,
-    src: plusButtonUrl,
-  },
-  {
-    alias: GameAssetsAlias.SPIN_BUTTON,
-    src: spinButtonUrl,
-  },
-  {
-    alias: GameAssetsAlias.DRAGON_DATA,
-    src: dragonSkelUrl,
-  },
-  {
-    alias: GameAssetsAlias.DRAGON_ATLAS,
-    src: dragonAtlasUrl,
+    alias: GameAssetsAlias.WISP_ATLAS,
+    src: wispAtlasUrl,
   },
 ];

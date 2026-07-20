@@ -3,8 +3,9 @@ import { gsap } from "gsap";
 import { Block } from "../core/Block";
 import { DemoSpinResult, Game } from "../core/Game";
 import { GameAssetsAlias } from "../configs/GameAssets";
+import { getSlotBoardLayout } from "../configs/GameLayout";
 
-type TileBounds = {
+type TileLayout = {
   x: number;
   y: number;
   width: number;
@@ -16,7 +17,7 @@ type Reel = {
   symbols: Sprite[];
   textureIndexes: number[];
   incomingTextureIndexes: number[];
-  tile: TileBounds;
+  tile: TileLayout;
   baseY: number;
   symbolStep: number;
 };
@@ -38,14 +39,12 @@ export class SlotBoardBlock extends Block {
     GameAssetsAlias.SYMBOL_INGOT,
   ];
   private readonly handleSpinRequest = (result: DemoSpinResult): void =>
-    this.spin(result.reelStops);
+    this.spin(result);
 
-  // These bounds follow the dark inner surfaces of the three board tiles in
-  // the 1536×1024 frame art. The mask stays inside the gold tile borders.
-  private readonly tileBounds: TileBounds[] = [
-    { x: 244, y: 319, width: 316, height: 486 },
-    { x: 598, y: 319, width: 340, height: 486 },
-    { x: 978, y: 319, width: 314, height: 486 },
+  private readonly tileLayouts: TileLayout[] = [
+    { x: 244 / 1536, y: 319 / 1024, width: 316 / 1536, height: 486 / 1024 },
+    { x: 598 / 1536, y: 319 / 1024, width: 340 / 1536, height: 486 / 1024 },
+    { x: 978 / 1536, y: 319 / 1024, width: 314 / 1536, height: 486 / 1024 },
   ];
 
   start(): void {
@@ -54,7 +53,7 @@ export class SlotBoardBlock extends Block {
     this.board.anchor.set(0.5);
     this.container.addChild(this.board);
 
-    this.reels = this.tileBounds.map((tile, reelIndex) =>
+    this.reels = this.tileLayouts.map((tile, reelIndex) =>
       this.createReel(tile, reelIndex),
     );
     this.symbolLayer.mask = this.reelMask;
@@ -70,47 +69,28 @@ export class SlotBoardBlock extends Block {
     if (!app || !this.board) return;
 
     const boardTexture = this.board.texture;
-    const { width, height } = app.screen;
-    const isCompactViewport = width <= 560 || height <= 600;
-
-    // The Pixi board shares the viewport with DOM controls. Reserve those
-    // regions here instead of relying on a fixed board offset, so it remains
-    // visible on narrow phones and short landscape screens.
-    const horizontalInset = Math.max(isCompactViewport ? 12 : 24, width * 0.02);
-    const topSafeArea = isCompactViewport
-      ? Math.max(58, height * 0.08)
-      : Math.max(78, height * 0.09);
-    const controlsSafeArea = isCompactViewport
-      ? Math.max(108, height * 0.18)
-      : Math.max(150, height * 0.18);
-    const maxBoardWidth = Math.min(width - horizontalInset * 2, 1240);
-    const maxBoardHeight = Math.max(
-      0,
-      height - topSafeArea - controlsSafeArea,
-    );
-    const boardScale = Math.min(
-      maxBoardWidth / boardTexture.orig.width,
-      maxBoardHeight / boardTexture.orig.height,
-    );
+    const layout = getSlotBoardLayout(app.screen.width, app.screen.height);
+    const boardScale = layout.boardScale;
 
     this.container.position.set(
-      width / 2,
-      topSafeArea + (boardTexture.orig.height * boardScale) / 2,
+      layout.boardCenterX,
+      layout.boardTop + (boardTexture.orig.height * boardScale) / 2,
     );
     this.board.scale.set(boardScale);
 
     this.reels.forEach((reel) => {
       const tileCenterX =
-        (reel.tile.x + reel.tile.width / 2 - boardTexture.orig.width / 2) *
+        (reel.tile.x + reel.tile.width / 2 - 0.5) *
+        boardTexture.orig.width *
         boardScale;
       const tileCenterY =
-        (reel.tile.y + reel.tile.height / 2 - boardTexture.orig.height / 2) *
+        (reel.tile.y + reel.tile.height / 2 - 0.5) *
+        boardTexture.orig.height *
         boardScale;
 
       reel.baseY = tileCenterY;
-      // A full-tile step keeps one symbol centered at rest, while the next
-      // symbol enters from the tile border during the spin.
-      reel.symbolStep = reel.tile.height * boardScale;
+      reel.symbolStep =
+        reel.tile.height * boardTexture.orig.height * boardScale;
       reel.strip.position.set(tileCenterX, tileCenterY);
       reel.symbols.forEach((symbol, symbolIndex) => {
         symbol.y = (symbolIndex - 1) * reel.symbolStep;
@@ -126,14 +106,22 @@ export class SlotBoardBlock extends Block {
     this.spinTimeline = undefined;
     this.isSpinning = false;
     Game.events.onSpinRequestedEvent.unsubscribe(this.handleSpinRequest);
+    Game.cancelActiveSpin();
     Game.events.onSpinStateChangedEvent.emit(false);
     this.container.parent?.removeChild(this.container);
+
+    this.symbolLayer.mask = null;
+    this.reels.forEach((reel) => {
+      reel.incomingTextureIndexes = [];
+      reel.textureIndexes = [];
+      reel.symbols = [];
+    });
     this.container.destroy({ children: true });
     this.board = undefined;
     this.reels = [];
   }
 
-  private createReel(tile: TileBounds, initialCenterIndex: number): Reel {
+  private createReel(tile: TileLayout, initialCenterIndex: number): Reel {
     const strip = new Container();
     const symbols = [-1, 0, 1].map(() => {
       const symbol = new Sprite();
@@ -157,23 +145,23 @@ export class SlotBoardBlock extends Block {
     return reel;
   }
 
-  private spin(finalSymbolIndexes: number[]): void {
+  private spin(result: DemoSpinResult): void {
     if (this.isSpinning || this.reels.length === 0) return;
 
+    const finalSymbolIndexes = result.reelStops;
     this.isSpinning = true;
     Game.events.onSpinStateChangedEvent.emit(true);
     this.spinTimeline?.kill();
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     this.spinTimeline = gsap.timeline({
       onComplete: () => {
         this.isSpinning = false;
         this.spinTimeline = undefined;
-        Game.playResultSound(
-          finalSymbolIndexes.every(
-            (symbol) => symbol === finalSymbolIndexes[0],
-          ),
-        );
+        Game.playResultSound(result.winAmount > 0);
+        Game.presentSpinResult(result);
         Game.events.onSpinStateChangedEvent.emit(false);
       },
     });
@@ -181,27 +169,24 @@ export class SlotBoardBlock extends Block {
     this.reels.forEach((reel, reelIndex) => {
       const cycles = reduceMotion ? 3 + reelIndex : 19 + reelIndex * 3;
       const finalIndex = finalSymbolIndexes[reelIndex];
-      // All reels begin together; the increasing cycle count keeps the
-      // familiar left-to-right stop order without delaying spin feedback.
       const startAt = 0;
       const rollingTime = cycles * REEL_ROLL_DURATION;
 
       this.prepareReelSpin(reel, finalIndex, cycles);
       reel.strip.y = reel.baseY;
 
-      this.spinTimeline!
-        .to(
-          reel.strip,
-          {
-            y: reel.baseY + reel.symbolStep,
-            duration: REEL_ROLL_DURATION,
-            repeat: cycles - 1,
-            ease: "none",
-            overwrite: "auto",
-            onRepeat: () => this.advanceReel(reel),
-          },
-          startAt,
-        )
+      this.spinTimeline!.to(
+        reel.strip,
+        {
+          y: reel.baseY + reel.symbolStep,
+          duration: REEL_ROLL_DURATION,
+          repeat: cycles - 1,
+          ease: "none",
+          overwrite: "auto",
+          onRepeat: () => this.advanceReel(reel),
+        },
+        startAt,
+      )
         .set(reel.strip, { y: reel.baseY }, startAt + rollingTime)
         .call(() => this.advanceReel(reel), undefined, startAt + rollingTime)
         .to(
@@ -248,19 +233,16 @@ export class SlotBoardBlock extends Block {
     finalIndex: number,
     cycles: number,
   ): void {
-    const textureIndexes = Array.from(
-      { length: 3 },
-      () => this.getRandomSymbolIndex(),
+    const textureIndexes = Array.from({ length: 3 }, () =>
+      this.getRandomSymbolIndex(),
     );
-    const incomingTextureIndexes = Array.from(
-      { length: cycles },
-      () => this.getRandomSymbolIndex(),
+    const incomingTextureIndexes = Array.from({ length: cycles }, () =>
+      this.getRandomSymbolIndex(),
     );
 
     if (cycles === 1) {
       textureIndexes[0] = finalIndex;
     } else {
-      // The top symbol becomes the final center symbol on the next advance.
       incomingTextureIndexes[cycles - 2] = finalIndex;
     }
 
@@ -283,15 +265,17 @@ export class SlotBoardBlock extends Block {
 
   private drawReelMask(boardTexture: Texture, boardScale: number): void {
     this.reelMask.clear();
-    this.tileBounds.forEach((tile) => {
-      const x = (tile.x - boardTexture.orig.width / 2) * boardScale;
-      const y = (tile.y - boardTexture.orig.height / 2) * boardScale;
+    this.tileLayouts.forEach((tile) => {
+      const x = (tile.x - 0.5) * boardTexture.orig.width * boardScale;
+      const y = (tile.y - 0.5) * boardTexture.orig.height * boardScale;
       this.reelMask.roundRect(
         x,
         y,
-        tile.width * boardScale,
-        tile.height * boardScale,
-        22 * boardScale,
+        tile.width * boardTexture.orig.width * boardScale,
+        tile.height * boardTexture.orig.height * boardScale,
+        Math.min(boardTexture.orig.width, boardTexture.orig.height) *
+          (22 / 1024) *
+          boardScale,
       );
     });
     this.reelMask.fill({ color: 0xffffff });

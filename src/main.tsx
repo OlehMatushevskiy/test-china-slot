@@ -4,6 +4,8 @@ import './style.css';
 import PixiCanvas from './pixi/PixiCanvas';
 import SlotControls from './components/SlotControls';
 import { PaylineInfo } from './components/PaylineInfo';
+import { SpinResultBanner } from './components/SpinResultBanner';
+import { ZeroBalanceFrame } from './components/ZeroBalanceFrame';
 import { Game, GameScene } from './core/Game';
 
 function App() {
@@ -26,6 +28,8 @@ function App() {
     </div>
     {isMainGameVisible && <>
       <PaylineInfo />
+      <SpinResultBanner />
+      <ZeroBalanceFrame />
       <SlotControls />
     </>}
   </main>
